@@ -17,6 +17,7 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     if (source) where.source = source
     if (req.query.isHighwaysRelated === "true") where.isHighwaysRelated = true
     if (req.query.isDemo === "true") where.isDemo = true
+    if (req.query.isDemo === "false") where.isDemo = false
     if (req.query.highways === "true") where.isHighwaysRelated = true
     if (search) {
       where.OR = [

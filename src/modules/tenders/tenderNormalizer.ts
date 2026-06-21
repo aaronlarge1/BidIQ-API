@@ -40,22 +40,29 @@ function parseDeadline(dateStr?: string): Date {
     const d = new Date(dateStr)
     if (!isNaN(d.getTime())) return d
   }
-  // Default: 90 days from now
   const fallback = new Date()
   fallback.setDate(fallback.getDate() + 90)
   return fallback
 }
 
-function parseValue(valueObj?: { amount?: number; currency?: string }): number {
-  return valueObj?.amount ?? 0
+// Handles both CF format ({amount}) and FTS format ({amountGross})
+function parseValue(valueObj?: { amount?: number; amountGross?: number; currency?: string }): number {
+  return valueObj?.amount ?? valueObj?.amountGross ?? 0
 }
 
+// Extracts CPV code from both CF (items[0].classification) and FTS (items[0].additionalClassifications)
 function extractCpvCode(tender: any): string | undefined {
   const items: any[] = tender?.items ?? []
   if (items.length > 0) {
+    // CF style
     const classification = items[0]?.classification
     if (classification?.id) return classification.id
+    // FTS style
+    const additional: any[] = items[0]?.additionalClassifications ?? []
+    const cpvEntry = additional.find((c: any) => c?.scheme === "CPV")
+    if (cpvEntry?.id) return cpvEntry.id
   }
+  // Tender-level additional classifications (CF fallback)
   const additional: any[] = tender?.additionalClassifications ?? []
   if (additional.length > 0) return additional[0]?.id
   return undefined
@@ -67,7 +74,16 @@ function extractDocuments(tender: any): string[] {
 }
 
 function extractLocation(buyer: any, release: any): { location: string; region: string } {
-  const address = buyer?.address ?? release?.buyer?.address ?? {}
+  // Try buyer directly (CF has address on buyer, FTS just has {id, name})
+  let address = buyer?.address
+  // FTS: find the buyer party in release.parties by role
+  if (!address && Array.isArray(release?.parties)) {
+    const buyerParty = release.parties.find((p: any) =>
+      Array.isArray(p?.roles) && p.roles.includes("buyer")
+    )
+    address = buyerParty?.address
+  }
+  address = address ?? {}
   const region = address?.region ?? address?.locality ?? address?.countryName ?? ""
   const location = [address?.streetAddress, address?.locality, address?.region, address?.postalCode]
     .filter(Boolean)
@@ -78,9 +94,16 @@ function extractLocation(buyer: any, release: any): { location: string; region: 
   }
 }
 
-function isSMEFriendly(title: string, description: string): boolean {
+function isSMEFriendlyText(title: string, description: string): boolean {
   const text = `${title} ${description}`.toLowerCase()
   return text.includes("sme") || text.includes("small business") || text.includes("small company")
+}
+
+// FTS has SME flag in lots[].suitability.sme
+function isSMEFriendlyFTS(tender: any, title: string, description: string): boolean {
+  if (isSMEFriendlyText(title, description)) return true
+  const lots: any[] = tender?.lots ?? []
+  return lots.some((l: any) => l?.suitability?.sme === true)
 }
 
 function mapStatus(tenderStatus: string, tag?: string[]): string {
@@ -124,8 +147,7 @@ export function normalizeContractsFinderRelease(release: any, noticeUrl: string)
     const buyerType = inferBuyerType(buyerName)
     const category = inferCategory(title, description, cpvCode)
     const status = mapStatus(tender.status ?? "active", release.tag)
-
-    const smeFlag = isSMEFriendly(title, description)
+    const smeFlag = isSMEFriendlyText(title, description)
 
     return {
       source: "contracts-finder",
@@ -175,15 +197,16 @@ export function normalizeFindTenderRelease(release: any): NormalizedTender | nul
     const description: string = tender.description ?? ""
     const searchText = `${title} ${description}`
 
-    const buyer = release?.buyer ?? release?.tender?.procuringEntity ?? {}
-    const buyerName: string = buyer.name ?? "Unknown Buyer"
+    // FTS: release.buyer is just {id, name}; full address is in parties
+    const buyerRef = release?.buyer ?? {}
+    const buyerName: string = buyerRef.name ?? "Unknown Buyer"
 
-    const { location, region } = extractLocation(buyer, release)
+    const { location, region } = extractLocation(buyerRef, release)
     const cpvCode = extractCpvCode(tender)
-    const sourceNoticeId: string = tender.id ?? release.ocid ?? ""
+    const sourceNoticeId: string = tender.id ?? release.id ?? release.ocid ?? ""
 
     const value = parseValue(tender.value)
-    const valueMax = tender.maxValue?.amount ?? undefined
+    const valueMax = tender.maxValue?.amountGross ?? tender.maxValue?.amount ?? undefined
 
     const deadline = parseDeadline(tender.tenderPeriod?.endDate)
     const publishedDate = release.date ? new Date(release.date) : new Date()
@@ -191,10 +214,9 @@ export function normalizeFindTenderRelease(release: any): NormalizedTender | nul
     const buyerType = inferBuyerType(buyerName)
     const category = inferCategory(title, description, cpvCode)
     const status = mapStatus(tender.status ?? "active", release.tag)
+    const smeFlag = isSMEFriendlyFTS(tender, title, description)
 
-    const smeFlag = isSMEFriendly(title, description)
-
-    const noticeId = tender.id ?? release.ocid ?? ""
+    const noticeId = tender.id ?? release.id ?? release.ocid ?? ""
     const sourceUrl = `https://www.find-tender.service.gov.uk/Notice/${noticeId}`
 
     return {
@@ -216,7 +238,7 @@ export function normalizeFindTenderRelease(release: any): NormalizedTender | nul
       status,
       description,
       cpvCode,
-      reference: tender.id,
+      reference: tender.id ?? release.id,
       socialValueWeighting: undefined,
       smeFlag,
       requiredDocuments: extractDocuments(tender),

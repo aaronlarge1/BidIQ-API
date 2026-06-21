@@ -1,27 +1,29 @@
 const BASE_URL = "https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages"
 
-function getDateString(date: Date): string {
-  return date.toISOString().split("T")[0]
+function getISO8601(date: Date): string {
+  // FTS requires ISO 8601 with timezone offset (not bare Z)
+  return date.toISOString().replace(/\.\d+Z$/, "+00:00")
 }
 
 function getDaysAgoDate(daysBack: number): Date {
   const d = new Date()
   d.setDate(d.getDate() - daysBack)
+  d.setHours(0, 0, 0, 0)
   return d
 }
 
 export async function fetchFindTenderNotices(daysBack: number = 3): Promise<any[]> {
-  const startDate = getDateString(getDaysAgoDate(daysBack))
-  const endDate = getDateString(new Date())
+  const startDate = getISO8601(getDaysAgoDate(daysBack))
   const allReleases: any[] = []
+  const limit = 100
+  let nextUrl: string | null =
+    `${BASE_URL}?updatedFrom=${encodeURIComponent(startDate)}&limit=${limit}`
   let page = 1
-  const size = 100
 
-  while (true) {
-    const url = `${BASE_URL}?startDate=${startDate}&endDate=${endDate}&page=${page}&size=${size}`
+  while (nextUrl) {
     try {
-      console.log(`[FindTender] Fetching page ${page}: ${url}`)
-      const response = await fetch(url, {
+      console.log(`[FindTender] Fetching page ${page}: ${nextUrl}`)
+      const response = await fetch(nextUrl, {
         headers: {
           Accept: "application/json",
           "User-Agent": "BidIQ/1.0 (procurement intelligence platform)",
@@ -37,12 +39,11 @@ export async function fetchFindTenderNotices(daysBack: number = 3): Promise<any[
       const data = await response.json() as any
       const releases: any[] = data?.releases ?? []
 
-      if (releases.length === 0) break
-
       allReleases.push(...releases)
       console.log(`[FindTender] Page ${page}: got ${releases.length} releases (total: ${allReleases.length})`)
 
-      if (releases.length < size) break
+      // Use the links.next URL for cursor-based pagination
+      nextUrl = data?.links?.next ?? null
 
       page++
 
@@ -50,6 +51,8 @@ export async function fetchFindTenderNotices(daysBack: number = 3): Promise<any[
         console.warn("[FindTender] Hit 20-page safety cap")
         break
       }
+
+      if (releases.length === 0) break
     } catch (err) {
       console.error(`[FindTender] Error fetching page ${page}:`, err)
       break

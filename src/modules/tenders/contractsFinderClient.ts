@@ -1,4 +1,4 @@
-const BASE_URL = "https://www.contractsfinder.service.gov.uk/Published/Notice/OCDS"
+const BASE_URL = "https://www.contractsfinder.service.gov.uk/Published/Notices/OCDS"
 
 function getDateString(date: Date): string {
   return date.toISOString().split("T")[0]

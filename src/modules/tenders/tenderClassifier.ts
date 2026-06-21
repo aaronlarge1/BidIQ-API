@@ -84,6 +84,19 @@ export function inferRegion(location: string, postcode?: string): string {
     if (regionMap[prefix]) return regionMap[prefix]
   }
 
+  // NUTS / ITL codes from Find a Tender (UKC=NE, UKD=NW, UKE=Yorks, UKF=EM, UKG=WM,
+  // UKH=EastEng, UKI=London, UKJ=SE, UKK=SW, UKL=Wales, UKM=Scotland, UKN=NI)
+  const nuts = location.toUpperCase().match(/^UK([A-N])/)
+  if (nuts) {
+    const nutsMap: Record<string, string> = {
+      C: "North East", D: "North West", E: "Yorkshire",
+      F: "East Midlands", G: "West Midlands", H: "East of England",
+      I: "London", J: "South East", K: "South West",
+      L: "Wales", M: "Scotland", N: "Northern Ireland",
+    }
+    if (nutsMap[nuts[1]]) return nutsMap[nuts[1]]
+  }
+
   return "National"
 }
 
