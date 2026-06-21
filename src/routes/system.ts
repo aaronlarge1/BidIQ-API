@@ -35,8 +35,8 @@ router.get("/integrations", (_req: Request, res: Response) => {
         url: "https://www.contractsfinder.service.gov.uk",
       },
       {
-        id: "anthropic-ai",
-        name: "Anthropic AI",
+        id: "openai",
+        name: "OpenAI",
         status: process.env.OPENAI_API_KEY ? "connected" : "not configured",
         description: "AI-powered bid assistance and tender scoring",
       },
