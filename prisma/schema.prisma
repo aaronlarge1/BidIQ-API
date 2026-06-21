@@ -116,8 +116,8 @@ model Bid {
   id            String        @id @default(cuid())
   companyId     String
   company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  tenderId      String
-  tender        Tender        @relation(fields: [tenderId], references: [id])
+  tenderId      String?
+  tender        Tender?       @relation(fields: [tenderId], references: [id])
   tenderTitle   String
   buyer         String
   value         Float
