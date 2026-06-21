@@ -21,6 +21,7 @@ import dashboardRoutes from "./routes/dashboard"
 import socialValueRoutes from "./routes/socialvalue"
 import marketIntelRoutes from "./routes/marketintel"
 import aiAssistRoutes from "./routes/aiassist"
+import systemRoutes from "./routes/system"
 import { errorHandler } from "./middleware/errorHandler"
 
 dotenv.config()
@@ -67,6 +68,7 @@ app.use("/api/dashboard", dashboardRoutes)
 app.use("/api/social-value", socialValueRoutes)
 app.use("/api/market-intel", marketIntelRoutes)
 app.use("/api/ai", aiLimiter, aiAssistRoutes)
+app.use("/api/system", systemRoutes)
 
 app.use(errorHandler)
 

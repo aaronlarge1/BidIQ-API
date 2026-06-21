@@ -14,7 +14,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        value: https://bidiq-pro.onrender.com
+        value: https://bidiq-frontend.onrender.com
 
 databases:
   - name: bidiq-db
