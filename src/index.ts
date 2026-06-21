@@ -50,6 +50,7 @@ app.use(globalLimiter)
 app.use(express.json({ limit: "5mb" }))
 
 // ── Health ────────────────────────────────────────────────────────────────────
+app.get("/", (_req, res) => res.json({ status: "ok", service: "BidIQ API" }))
 app.get("/health", (_req, res) => res.json({ status: "ok", ts: new Date().toISOString() }))
 
 // ── Routes ────────────────────────────────────────────────────────────────────
