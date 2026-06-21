@@ -1,0 +1,313 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["omitApi"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company?
+}
+
+model Company {
+  id                       String            @id @default(cuid())
+  userId                   String            @unique
+  user                     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                     String
+  sector                   String
+  services                 String[]
+  turnover                 Float             @default(0)
+  employees                Int               @default(0)
+  regions                  String[]
+  insurance                String[]
+  policies                 String[]
+  accreditations           String[]
+  previousPublicSectorWork Boolean           @default(false)
+  preferredContractValue   String            @default("100k-500k")
+  interests                String[]
+  readinessScore           Int               @default(0)
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  bids                     Bid[]
+  contracts                Contract[]
+  documents                Document[]
+  evidence                 Evidence[]
+  partners                 Partner[]
+  calendarEvents           CalendarEvent[]
+  socialValueActivities    SocialValueActivity[]
+  readinessProfile         ReadinessProfile?
+}
+
+model ReadinessProfile {
+  id          String          @id @default(cuid())
+  companyId   String          @unique
+  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  overall     Int             @default(0)
+  creditScore Int             @default(0)
+  lastChecked DateTime        @default(now())
+  areas       ReadinessArea[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model ReadinessArea {
+  id        String           @id @default(cuid())
+  profileId String
+  profile   ReadinessProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name      String
+  status    String
+  score     Int
+  issues    String[]
+  actions   String[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model Tender {
+  id                      String   @id @default(cuid())
+  title                   String
+  buyer                   String
+  buyerType               String
+  location                String
+  region                  String
+  value                   Float
+  valueMax                Float?
+  deadline                DateTime
+  publishedDate           DateTime
+  category                String
+  type                    String
+  status                  String   @default("open")
+  recommendation          String?
+  opportunityScore        Int?
+  eligibilityScore        Int?
+  smeFlag                 Boolean  @default(false)
+  description             String
+  cpvCode                 String?
+  reference               String?
+  socialValueWeighting    Int?
+  framework               String?
+  winProbability          Float?
+  requiredDocuments       String[]
+  missingDocuments        String[]
+  insuranceRequired       String[]
+  accreditationsRequired  String[]
+  socialValueRequirements String?
+  deliveryRisk            String?
+  financialRisk           String?
+  bidEffort               String?
+  buyerNotes              String?
+  recommendedAction       String?
+  estimatedBidCost        Float?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  bids                    Bid[]
+}
+
+model Bid {
+  id            String        @id @default(cuid())
+  companyId     String
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tenderId      String
+  tender        Tender        @relation(fields: [tenderId], references: [id])
+  tenderTitle   String
+  buyer         String
+  value         Float
+  deadline      DateTime
+  stage         String        @default("identified")
+  score         Float?
+  submittedDate DateTime?
+  awardedDate   DateTime?
+  notes         String        @default("")
+  assignedTo    String        @default("")
+  probability   Float         @default(0)
+  questions     BidQuestion[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model BidQuestion {
+  id          String   @id @default(cuid())
+  bidId       String
+  bid         Bid      @relation(fields: [bidId], references: [id], onDelete: Cascade)
+  section     String
+  question    String
+  wordLimit   Int?
+  answer      String   @default("")
+  aiScore     Float?
+  suggestions String[]
+  status      String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Contract {
+  id              String      @id @default(cuid())
+  companyId       String
+  company         Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title           String
+  buyer           String
+  value           Float
+  startDate       DateTime
+  endDate         DateTime
+  renewalDate     DateTime
+  milestones      Milestone[]
+  kpis            KPI[]
+  paymentSchedule Payment[]
+  risks           Risk[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model Milestone {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  title      String
+  dueDate    DateTime
+  status     String   @default("pending")
+  value      Float?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model KPI {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  name       String
+  target     Float
+  current    Float    @default(0)
+  unit       String
+  status     String   @default("green")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  description String
+  amount      Float
+  dueDate     DateTime
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Risk {
+  id          String   @id @default(cuid())
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  description String
+  likelihood  String
+  impact      String
+  mitigation  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Document {
+  id           String    @id @default(cuid())
+  companyId    String
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name         String
+  category     String
+  uploadedDate DateTime  @default(now())
+  expiryDate   DateTime?
+  status       String    @default("valid")
+  url          String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Evidence {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contractId  String?
+  title       String
+  type        String
+  date        DateTime
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Partner {
+  id             String   @id @default(cuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name           String
+  sector         String
+  capabilities   String[]
+  region         String
+  accreditations String[]
+  turnover       Float    @default(0)
+  combinedScore  Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Buyer {
+  id                 String          @id @default(cuid())
+  name               String
+  type               String
+  region             String
+  annualSpend        Float           @default(0)
+  previousAwards     PreviousAward[]
+  upcomingRenewals   String[]
+  knownSuppliers     String[]
+  nextTenderExpected DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
+model PreviousAward {
+  id          String   @id @default(cuid())
+  buyerId     String
+  buyer       Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  title       String
+  supplier    String
+  value       Float
+  awardedDate DateTime
+  renewalDate DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SocialValueActivity {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type        String
+  description String
+  date        DateTime
+  value       Float?
+  unit        String?
+  contractId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CalendarEvent {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title      String
+  date       DateTime
+  type       String
+  tenderId   String?
+  documentId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
