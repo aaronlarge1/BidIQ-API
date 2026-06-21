@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
-    "start": "npx prisma db push --skip-generate && node dist/index.js",
+    "start": "node scripts/start-server.js",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma db push",
@@ -24,6 +24,7 @@
     "express": "^4.21.0",
     "express-rate-limit": "^8.5.2",
     "google-auth-library": "^10.7.0",
+    "prisma": "^5.20.0",
     "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.2",
     "openai": "^6.44.0"
@@ -39,7 +40,6 @@
     "@types/helmet": "^0.0.48",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.7.4",
-    "prisma": "^5.20.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.5.3"
