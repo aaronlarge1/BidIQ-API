@@ -5,6 +5,7 @@ import compression from "compression"
 import { rateLimit } from "express-rate-limit"
 import dotenv from "dotenv"
 
+import { runTenderSync } from "./modules/tenders/tenderSyncJob"
 import authRoutes from "./routes/auth"
 import companyRoutes from "./routes/company"
 import readinessRoutes from "./routes/readiness"
@@ -75,3 +76,13 @@ app.use(errorHandler)
 app.listen(PORT, () => {
   console.log(`BidIQ API running on port ${PORT} [${process.env.NODE_ENV ?? "development"}]`)
 })
+
+// ── Tender sync scheduler ─────────────────────────────────────────────────────
+if (process.env.TENDER_SYNC_ENABLED === "true") {
+  const intervalHours = parseInt(process.env.TENDER_SYNC_INTERVAL_HOURS ?? "3", 10)
+  console.log(`Tender sync scheduler started (every ${intervalHours}h)`)
+  setTimeout(async () => {
+    await runTenderSync({ daysBack: 3 }).catch(console.error)
+    setInterval(() => runTenderSync({ daysBack: 1 }).catch(console.error), intervalHours * 60 * 60 * 1000)
+  }, 30_000)
+}

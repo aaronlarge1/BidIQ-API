@@ -11,7 +11,9 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "sync:tenders": "ts-node --transpile-only src/scripts/syncTenders.ts",
+    "sync:tenders:prod": "node dist/scripts/syncTenders.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",

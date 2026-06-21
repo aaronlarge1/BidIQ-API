@@ -1,0 +1,33 @@
+-- AlterTable: Add new fields to Tender
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "source" TEXT NOT NULL DEFAULT 'demo';
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "sourceNoticeId" TEXT;
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "sourceUrl" TEXT;
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "ocid" TEXT;
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "isHighwaysRelated" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "isNationalHighways" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "isInfrastructureRelated" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "isSMEFriendly" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "rawJson" JSONB;
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "summary" TEXT;
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "keyRequirements" TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "lastSyncedAt" TIMESTAMP(3);
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "isDemo" BOOLEAN NOT NULL DEFAULT false;
+
+-- CreateUniqueIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "Tender_source_sourceNoticeId_key" ON "Tender"("source", "sourceNoticeId");
+
+-- CreateTable: TenderSyncLog
+CREATE TABLE IF NOT EXISTS "TenderSyncLog" (
+    "id" TEXT NOT NULL,
+    "source" TEXT NOT NULL,
+    "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "finishedAt" TIMESTAMP(3),
+    "status" TEXT NOT NULL DEFAULT 'running',
+    "importedCount" INTEGER NOT NULL DEFAULT 0,
+    "updatedCount" INTEGER NOT NULL DEFAULT 0,
+    "failedCount" INTEGER NOT NULL DEFAULT 0,
+    "errorMessage" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TenderSyncLog_pkey" PRIMARY KEY ("id")
+);

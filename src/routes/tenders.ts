@@ -7,13 +7,17 @@ router.use(requireAuth)
 
 router.get("/", async (req: AuthRequest, res: Response) => {
   try {
-    const { status, category, region, recommendation, search, page = "1", limit = "20" } = req.query
+    const { status, category, region, recommendation, search, source, page = "1", limit = "20" } = req.query
 
     const where: Record<string, unknown> = {}
     if (status) where.status = status
     if (category) where.category = category
     if (region) where.region = region
     if (recommendation) where.recommendation = recommendation
+    if (source) where.source = source
+    if (req.query.isHighwaysRelated === "true") where.isHighwaysRelated = true
+    if (req.query.isDemo === "true") where.isDemo = true
+    if (req.query.highways === "true") where.isHighwaysRelated = true
     if (search) {
       where.OR = [
         { title: { contains: search as string, mode: "insensitive" } },

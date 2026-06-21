@@ -73,7 +73,7 @@ model ReadinessArea {
 }
 
 model Tender {
-  id                      String   @id @default(cuid())
+  id                      String    @id @default(cuid())
   title                   String
   buyer                   String
   buyerType               String
@@ -85,11 +85,11 @@ model Tender {
   publishedDate           DateTime
   category                String
   type                    String
-  status                  String   @default("open")
+  status                  String    @default("open")
   recommendation          String?
   opportunityScore        Int?
   eligibilityScore        Int?
-  smeFlag                 Boolean  @default(false)
+  smeFlag                 Boolean   @default(false)
   description             String
   cpvCode                 String?
   reference               String?
@@ -107,9 +107,37 @@ model Tender {
   buyerNotes              String?
   recommendedAction       String?
   estimatedBidCost        Float?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  source                  String    @default("demo")
+  sourceNoticeId          String?
+  sourceUrl               String?
+  ocid                    String?
+  isHighwaysRelated       Boolean   @default(false)
+  isNationalHighways      Boolean   @default(false)
+  isInfrastructureRelated Boolean   @default(false)
+  isSMEFriendly           Boolean   @default(false)
+  rawJson                 Json?
+  summary                 String?
+  keyRequirements         String[]
+  lastSyncedAt            DateTime?
+  isDemo                  Boolean   @default(false)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
   bids                    Bid[]
+
+  @@unique([source, sourceNoticeId])
+}
+
+model TenderSyncLog {
+  id             String    @id @default(cuid())
+  source         String
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  status         String    @default("running")
+  importedCount  Int       @default(0)
+  updatedCount   Int       @default(0)
+  failedCount    Int       @default(0)
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
 }
 
 model Bid {
