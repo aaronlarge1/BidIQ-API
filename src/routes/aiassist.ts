@@ -8,7 +8,10 @@ router.use(requireAuth)
 
 function getClient(): Anthropic | null {
   if (!process.env.ANTHROPIC_API_KEY) return null
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  return new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    defaultHeaders: { "anthropic-beta": "prompt-caching-2024-07-31" },
+  })
 }
 
 // Score and improve a bid question answer
@@ -25,7 +28,7 @@ router.post("/score-answer", async (req: AuthRequest, res: Response) => {
       max_tokens: 1024,
       messages: [{
         role: "user",
-        content: `You are an expert UK public sector bid writer. Score the following bid question answer and provide specific improvement suggestions.
+        content: `You are an expert UK public sector bid evaluator. Score this bid answer and give precise improvement feedback.
 
 Tender: ${tenderTitle ?? "Unknown"}
 Buyer type: ${buyerType ?? "Unknown"}
@@ -52,7 +55,7 @@ Respond with JSON only:
   } catch { res.status(500).json({ error: "AI scoring failed" }) }
 })
 
-// Generate a bid answer from scratch
+// Generate a bid answer from scratch — uses prompt caching on company context
 router.post("/generate-answer", async (req: AuthRequest, res: Response) => {
   const client = getClient()
   if (!client) { res.status(503).json({ error: "AI features not configured" }); return }
@@ -64,30 +67,64 @@ router.post("/generate-answer", async (req: AuthRequest, res: Response) => {
   try {
     const company = await prisma.company.findUnique({ where: { id: req.companyId } })
     const previousEvidence = bidId
-      ? await prisma.evidence.findMany({ where: { companyId: req.companyId }, take: 3 })
+      ? await prisma.evidence.findMany({ where: { companyId: req.companyId }, take: 5 })
       : []
+
+    // System prompt is cached — stable per company, reused across all generate calls
+    const systemText = `You are an expert UK public sector bid writer helping ${company?.name ?? "an SME"} win public sector contracts.
+
+COMPANY PROFILE:
+- Name: ${company?.name ?? "Unknown"}
+- Sector: ${company?.sector ?? "Unknown"}
+- Services: ${company?.services?.join(", ") ?? "Various"}
+- Accreditations: ${company?.accreditations?.join(", ") ?? "None listed"}
+- Regions active in: ${company?.regions?.join(", ") ?? "UK-wide"}
+- Employee count: ${company?.employees ?? "Unknown"}
+- Annual turnover: £${company?.turnover?.toLocaleString() ?? "Unknown"}
+- Previous public sector work: ${company?.previousPublicSectorWork ? "Yes" : "No"}
+- Preferred contract value: ${company?.preferredContractValue ?? "Unknown"}
+${previousEvidence.length > 0 ? `- Recent project evidence: ${previousEvidence.map((e) => e.title).join("; ")}` : ""}
+
+WRITING STANDARDS — follow these without exception:
+1. Address the question directly and immediately — no preamble or meta-commentary
+2. Use STAR methodology (Situation, Task, Action, Result) for past experience questions
+3. Reference specific accreditations, policies and certifications held by the company
+4. Include measurable outcomes: percentages, timescales, quantities, cost savings
+5. Focus on the BUYER's outcomes and KPIs, not the company's internal pride
+6. Never use vague claims — replace "we have extensive experience" with concrete delivery evidence
+7. Write in clear, confident, professional UK English appropriate for public sector evaluators
+8. Never include JSON, markdown headers, or any wrapper around the answer
+9. Maintain a consultative, collaborative tone — not a sales pitch
+
+UK PROCUREMENT CONTEXT you must apply:
+- Social value (Public Services Social Value Act 2012) carries 10-20% weighting in most tenders
+- Method statements must address delivery approach, team structure, risk management and escalation
+- Financial capacity questions require turnover benchmarks (typically 2× annual contract value)
+- Equality, diversity and inclusion requirements apply to all contracts above threshold
+- Environmental and Net Zero commitments are increasingly scored criteria
+- TUPE (Transfer of Undertakings Protection of Employment) applies to service transfer contracts
+- SME-friendly language: reference any frameworks, DPS or G-Cloud lotholdings if applicable
+- Buyer types and their priorities: NHS (patient outcomes, infection control, value), Local Authority (social value, local employment, sustainability), Central Government (security, compliance, scalability), Highways (safety, traffic management, community impact), Education (safeguarding, DBS, SEND awareness)`
 
     const message = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 2048,
+      system: [
+        {
+          type: "text",
+          text: systemText,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
       messages: [{
         role: "user",
-        content: `You are an expert UK public sector bid writer for an SME.
-
-Company: ${company?.name ?? "Unknown"}
-Sector: ${company?.sector ?? "Unknown"}
-Services: ${company?.services?.join(", ") ?? "Various"}
-Accreditations: ${company?.accreditations?.join(", ") ?? "None listed"}
-Tender: ${tenderTitle ?? "Unknown"}
+        content: `Tender: ${tenderTitle ?? "Unknown"}
 Buyer type: ${buyerType ?? "Unknown"}
-${previousEvidence.length > 0 ? `Recent evidence: ${previousEvidence.map((e) => e.title).join(", ")}` : ""}
-
-Write a compelling, specific bid answer for the following question. Use concrete examples, reference relevant accreditations and experience, and focus on the buyer's outcomes.
-${wordLimit ? `Keep within ${wordLimit} words.` : "Aim for 300-400 words."}
+${wordLimit ? `Word limit: ${wordLimit} words — stay within this strictly.` : "Aim for 350-450 words."}
 
 Question: ${question}
 
-Return the answer as plain text only — no preamble or JSON wrapper.`,
+Write the complete bid answer now.`,
       }],
     })
 
@@ -138,7 +175,7 @@ Tender:
 - Region: ${tender.region}
 - Required insurance: ${tender.insuranceRequired.join(", ")}
 - Required accreditations: ${tender.accreditationsRequired.join(", ")}
-- Description: ${tender.description.slice(0, 300)}
+- Description: ${tender.description.slice(0, 400)}
 
 Respond with JSON only:
 {
