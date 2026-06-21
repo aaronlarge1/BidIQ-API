@@ -1,17 +1,14 @@
 import { Router, Response } from "express"
-import Anthropic from "@anthropic-ai/sdk"
+import OpenAI from "openai"
 import { prisma } from "../lib/prisma"
 import { requireAuth, AuthRequest } from "../middleware/auth"
 
 const router = Router()
 router.use(requireAuth)
 
-function getClient(): Anthropic | null {
-  if (!process.env.ANTHROPIC_API_KEY) return null
-  return new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-    defaultHeaders: { "anthropic-beta": "prompt-caching-2024-07-31" },
-  })
+function getClient(): OpenAI | null {
+  if (!process.env.OPENAI_API_KEY) return null
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 }
 
 // Score and improve a bid question answer
@@ -23,12 +20,18 @@ router.post("/score-answer", async (req: AuthRequest, res: Response) => {
   if (!question || !answer) { res.status(400).json({ error: "question and answer are required" }); return }
 
   try {
-    const message = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+    const response = await client.chat.completions.create({
+      model: "gpt-4.1-mini",
       max_tokens: 1024,
-      messages: [{
-        role: "user",
-        content: `You are an expert UK public sector bid evaluator. Score this bid answer and give precise improvement feedback.
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert UK public sector bid evaluator. Always respond with valid JSON only.",
+        },
+        {
+          role: "user",
+          content: `Score this bid answer and give precise improvement feedback.
 
 Tender: ${tenderTitle ?? "Unknown"}
 Buyer type: ${buyerType ?? "Unknown"}
@@ -44,18 +47,16 @@ Respond with JSON only:
   "improvements": ["<specific suggestion 1>", "<specific suggestion 2>", "<specific suggestion 3>"],
   "rewrittenOpening": "<improved opening sentence>"
 }`,
-      }],
+        },
+      ],
     })
 
-    const text = message.content[0].type === "text" ? message.content[0].text : ""
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) { res.status(500).json({ error: "AI response parsing failed" }); return }
-
-    res.json(JSON.parse(jsonMatch[0]))
+    const text = response.choices[0].message.content ?? ""
+    res.json(JSON.parse(text))
   } catch { res.status(500).json({ error: "AI scoring failed" }) }
 })
 
-// Generate a bid answer from scratch — uses prompt caching on company context
+// Generate a bid answer from scratch
 router.post("/generate-answer", async (req: AuthRequest, res: Response) => {
   const client = getClient()
   if (!client) { res.status(503).json({ error: "AI features not configured" }); return }
@@ -70,7 +71,6 @@ router.post("/generate-answer", async (req: AuthRequest, res: Response) => {
       ? await prisma.evidence.findMany({ where: { companyId: req.companyId }, take: 5 })
       : []
 
-    // System prompt is cached — stable per company, reused across all generate calls
     const systemText = `You are an expert UK public sector bid writer helping ${company?.name ?? "an SME"} win public sector contracts.
 
 COMPANY PROFILE:
@@ -106,34 +106,30 @@ UK PROCUREMENT CONTEXT you must apply:
 - SME-friendly language: reference any frameworks, DPS or G-Cloud lotholdings if applicable
 - Buyer types and their priorities: NHS (patient outcomes, infection control, value), Local Authority (social value, local employment, sustainability), Central Government (security, compliance, scalability), Highways (safety, traffic management, community impact), Education (safeguarding, DBS, SEND awareness)`
 
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-6",
+    const response = await client.chat.completions.create({
+      model: "gpt-4.1",
       max_tokens: 2048,
-      system: [
+      messages: [
+        { role: "system", content: systemText },
         {
-          type: "text",
-          text: systemText,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages: [{
-        role: "user",
-        content: `Tender: ${tenderTitle ?? "Unknown"}
+          role: "user",
+          content: `Tender: ${tenderTitle ?? "Unknown"}
 Buyer type: ${buyerType ?? "Unknown"}
 ${wordLimit ? `Word limit: ${wordLimit} words — stay within this strictly.` : "Aim for 350-450 words."}
 
 Question: ${question}
 
 Write the complete bid answer now.`,
-      }],
+        },
+      ],
     })
 
-    const answer = message.content[0].type === "text" ? message.content[0].text : ""
+    const answer = response.choices[0].message.content ?? ""
     res.json({ answer })
   } catch { res.status(500).json({ error: "AI generation failed" }) }
 })
 
-// Opportunity match score — explain why a tender is/isn't a good fit
+// Opportunity match score
 router.post("/match-score", async (req: AuthRequest, res: Response) => {
   const client = getClient()
   if (!client) { res.status(503).json({ error: "AI features not configured" }); return }
@@ -149,12 +145,18 @@ router.post("/match-score", async (req: AuthRequest, res: Response) => {
     ])
     if (!company || !tender) { res.status(404).json({ error: "Company or tender not found" }); return }
 
-    const message = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+    const response = await client.chat.completions.create({
+      model: "gpt-4.1-mini",
       max_tokens: 1024,
-      messages: [{
-        role: "user",
-        content: `You are a UK procurement expert. Score how well this company matches this tender opportunity.
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: "You are a UK procurement expert. Always respond with valid JSON only.",
+        },
+        {
+          role: "user",
+          content: `Score how well this company matches this tender opportunity.
 
 Company:
 - Name: ${company.name}
@@ -187,14 +189,12 @@ Respond with JSON only:
   "winProbability": <0-100>,
   "estimatedBidCost": <integer GBP>
 }`,
-      }],
+        },
+      ],
     })
 
-    const text = message.content[0].type === "text" ? message.content[0].text : ""
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) { res.status(500).json({ error: "AI response parsing failed" }); return }
-
-    res.json(JSON.parse(jsonMatch[0]))
+    const text = response.choices[0].message.content ?? ""
+    res.json(JSON.parse(text))
   } catch { res.status(500).json({ error: "AI match scoring failed" }) }
 })
 

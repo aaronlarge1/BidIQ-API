@@ -16,7 +16,6 @@
     "sync:tenders:prod": "node dist/scripts/syncTenders.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.105.0",
     "@prisma/client": "^5.20.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.8.1",
@@ -25,7 +24,8 @@
     "express": "^4.21.0",
     "express-rate-limit": "^8.5.2",
     "helmet": "^8.2.0",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "openai": "^6.44.0"
   },
   "prisma": {
     "seed": "ts-node --transpile-only prisma/seed.ts"

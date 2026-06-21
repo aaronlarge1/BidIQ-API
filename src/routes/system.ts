@@ -12,7 +12,7 @@ router.get("/status", (_req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
     services: {
       database: "connected",
-      ai: process.env.ANTHROPIC_API_KEY ? "connected" : "not configured",
+      ai: process.env.OPENAI_API_KEY ? "connected" : "not configured",
     },
   })
 })
@@ -37,7 +37,7 @@ router.get("/integrations", (_req: Request, res: Response) => {
       {
         id: "anthropic-ai",
         name: "Anthropic AI",
-        status: process.env.ANTHROPIC_API_KEY ? "connected" : "not configured",
+        status: process.env.OPENAI_API_KEY ? "connected" : "not configured",
         description: "AI-powered bid assistance and tender scoring",
       },
     ],
